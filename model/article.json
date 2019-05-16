@@ -1,0 +1,16 @@
+{
+    "title": "articleModel",
+    "type": "object",
+    "properties": {
+        "author": {
+            "type": "string"
+        },
+        "contents": {
+            "type": "string"
+        },
+        "title": {
+            "type": "string"
+        }
+    },
+    "required": ["author", "contents","title"]
+}

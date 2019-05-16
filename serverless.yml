@@ -1,0 +1,229 @@
+# Welcome to Serverless!
+#
+# This file is the main config file for your service.
+# It's very minimal at this point and uses default values.
+# You can always add more config options for more control.
+# We've included some commented out config examples here.
+# Just uncomment any of them to get that config option.
+#
+# For full config options, check the docs:
+#    docs.serverless.com
+#
+# Happy Coding!
+
+service: serverless-blog-api 
+plugins:
+  - serverless-reqvalidator-plugin
+  - serverless-aws-documentation
+
+provider:
+  name: aws
+  runtime: python3.7
+  region: ap-northeast-1
+  iamRoleStatements:
+   - Effect: "Allow"
+     Action:
+       - "dynamodb:*"
+     Resource:
+       - 'Fn::Join':
+         - ':'
+         -
+           - 'arn:aws:dynamodb'
+           - ${self:provider.region}
+           - Ref: 'AWS::AccountId'
+           - 'table/*'
+
+custom:
+  documentation:
+    api:
+      info:
+        version: '1.0.0'
+        title: My API
+        description: This is my API
+      tags:
+        -
+          name: User
+          description: User Management
+    models:
+      - name: articleModel
+        contentType: "application/json"
+        schema: ${file(model/article.json)}
+
+functions:
+  getArticle:
+    handler: handlers/article.get_article_handler
+    name: getArticle
+    memorySize: 1024
+    timeout: 300
+    events:
+      - http:
+          path: /article/{title}
+          method: get
+          integration: lambda-proxy
+          cors:
+            origin: '*'
+            headers:
+              - Content-Type
+              - X-Amz-Date
+              - Authorization
+              - X-Api-Key
+              - X-Amz-Security-Token
+              - X-Amz-User-Agent
+              - Pragma
+              - Cache-Control
+              - If-Modified-Since
+            allowCredentials: true
+          request:
+            parameters:
+              paths:
+                title: true
+  postArticle:
+    handler: handlers/article.put_article_handler
+    name: postArticle
+    memorySize: 1024
+    timeout: 300
+    events:
+      - http:
+          path: /article/{title}
+          method: post
+          integration: lambda-proxy
+          reqValidatorName: 'onlyBody'
+          cors:
+            origin: '*'
+            headers:
+              - Content-Type
+              - X-Amz-Date
+              - Authorization
+              - X-Api-Key
+              - X-Amz-Security-Token
+              - X-Amz-User-Agent
+              - Pragma
+              - Cache-Control
+              - If-Modified-Since
+            allowCredentials: true
+          request:
+            parameters:
+              paths:
+                title: true
+          documentation:
+            summary: "Post a article"
+            description: "Post a article"
+            requestModels:
+              "application/json": "articleModel"
+
+  deleteArticle:
+    handler: handlers/article.delete_article_handler
+    name: deleteArticle
+    memorySize: 1024
+    timeout: 300
+    events:
+      - http:
+          path: /article/{title}
+          method: delete
+          integration: lambda-proxy
+          cors:
+            origin: '*'
+            headers:
+              - Content-Type
+              - X-Amz-Date
+              - Authorization
+              - X-Api-Key
+              - X-Amz-Security-Token
+              - X-Amz-User-Agent
+              - Pragma
+              - Cache-Control
+              - If-Modified-Since
+            allowCredentials: true
+          request:
+            parameters:
+              paths:
+                title: true
+  latestArticle:
+    handler: handlers/article.get_latest_article_handler
+    name: getLatestArticle
+    memorySize: 1024
+    timeout: 300
+    events:
+      - http:
+          path: /latestArticle
+          method: get
+          integration: lambda-proxy
+          cors:
+            origin: '*'
+            headers:
+              - Content-Type
+              - X-Amz-Date
+              - Authorization
+              - X-Api-Key
+              - X-Amz-Security-Token
+              - X-Amz-User-Agent
+              - Pragma
+              - Cache-Control
+              - If-Modified-Since
+            allowCredentials: true
+          request:
+            parameters:
+              paths:
+                title: true
+
+# you can add CloudFormation resource templates here
+resources:
+  Resources:
+    # APIG
+    ApiGatewayRestApi:
+      Type: AWS::ApiGateway::RestApi
+      Properties:
+        Name: ${self:service}-api-${self:provider.stage}
+    # APIG Request Validation
+    onlyBody:  
+      Type: "AWS::ApiGateway::RequestValidator"
+      Properties:
+        Name: 'only-body'
+        RestApiId: 
+          Ref: ApiGatewayRestApi
+        ValidateRequestBody: true
+        ValidateRequestParameters: false
+    bothParams:  
+      Type: "AWS::ApiGateway::RequestValidator"
+      Properties:
+        Name: 'both-params'
+        RestApiId: 
+          Ref: ApiGatewayRestApi
+        ValidateRequestBody: true
+        ValidateRequestParameters: true
+    onlyReqParams:  
+      Type: "AWS::ApiGateway::RequestValidator"
+      Properties:
+        Name: 'only-req-params'
+        RestApiId: 
+          Ref: ApiGatewayRestApi
+        ValidateRequestBody: false
+        ValidateRequestParameters: true
+    PostTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: postObject
+        AttributeDefinitions:
+          - AttributeName: postCategory
+            AttributeType: S
+          - AttributeName: uri
+            AttributeType: S
+          - AttributeName: createdAt
+            AttributeType: N
+        KeySchema:
+          - AttributeName: postCategory
+            KeyType: HASH
+          - AttributeName: uri
+            KeyType: RANGE
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
+        LocalSecondaryIndexes:
+          - IndexName: postCategory-createdAt-index
+            KeySchema:
+            - AttributeName: postCategory
+              KeyType: HASH
+            - AttributeName: createdAt
+              KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
